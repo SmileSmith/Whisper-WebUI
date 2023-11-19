@@ -5,8 +5,10 @@ import argparse
 from modules.whisper_Inference import WhisperInference
 from modules.faster_whisper_inference import FasterWhisperInference
 from modules.nllb_inference import NLLBInference
-from ui.htmls import *
+from ui.htmls import CSS, MARKDOWN, NLLB_VRAM_TABLE
 from modules.youtube_manager import get_ytmetas
+
+os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
 
 
 class App:
