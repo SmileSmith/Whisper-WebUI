@@ -8,6 +8,7 @@ from modules.nllb_inference import NLLBInference
 from ui.htmls import CSS, MARKDOWN, NLLB_VRAM_TABLE
 from modules.youtube_manager import get_ytmetas
 
+# localhost etc. must not be proxy
 os.environ["no_proxy"] = "localhost,127.0.0.1,::1"
 
 
@@ -32,11 +33,18 @@ class App:
 
     @staticmethod
     def on_change_models(model_size: str):
-        translatable_model = ["large", "large-v1", "large-v2"]
+        translatable_model = ["large", "large-v1", "large-v2", "large-v3"]
         if model_size not in translatable_model:
             return gr.Checkbox.update(visible=False, value=False, interactive=False)
         else:
             return gr.Checkbox.update(visible=True, value=False, label="Translate to English?", interactive=True)
+
+    @staticmethod
+    def on_change_diarization(diarization: bool):
+        if diarization:
+            return gr.Dropdown.update(choices=["SRT", "WebVTT", "txt"], value="WebVTT", label="Speaker Diarization?", interactive=False)
+        else:
+            return gr.Dropdown.update(choices=["SRT", "WebVTT", "txt"], value="SRT", label="Speaker Diarization?", interactive=True)
 
     def launch(self):
         with self.app:
@@ -56,6 +64,8 @@ class App:
                     with gr.Row():
                         cb_translate = gr.Checkbox(value=False, label="Translate to English?", interactive=True)
                     with gr.Row():
+                        cb_diarization = gr.Checkbox(value=False, label="Speaker Diarization?", interactive=True)
+                    with gr.Row():
                         cb_timestamp = gr.Checkbox(value=True, label="Add a timestamp to the end of the filename", interactive=True)
                     with gr.Accordion("Advanced_Parameters", open=False):
                         nb_beam_size = gr.Number(label="Beam Size", value=1, precision=0, interactive=True)
@@ -68,13 +78,14 @@ class App:
                         tb_indicator = gr.Textbox(label="Output", scale=8)
                         btn_openfolder = gr.Button('📂', scale=2)
 
-                    params = [input_file, dd_model, dd_lang, dd_file_format, cb_translate, cb_timestamp]
+                    params = [input_file, dd_model, dd_lang, dd_file_format, cb_translate, cb_diarization, cb_timestamp]
                     advanced_params = [nb_beam_size, nb_log_prob_threshold, nb_no_speech_threshold, dd_compute_type]
                     btn_run.click(fn=self.whisper_inf.transcribe_file,
                                   inputs=params + advanced_params,
                                   outputs=[tb_indicator])
                     btn_openfolder.click(fn=lambda: self.open_folder("outputs"), inputs=None, outputs=None)
                     dd_model.change(fn=self.on_change_models, inputs=[dd_model], outputs=[cb_translate])
+                    cb_diarization.change(fn=self.on_change_diarization, inputs=[cb_diarization], outputs=[dd_file_format])
 
                 with gr.TabItem("Youtube"):  # tab2
                     with gr.Row():
@@ -94,6 +105,8 @@ class App:
                     with gr.Row():
                         cb_translate = gr.Checkbox(value=False, label="Translate to English?", interactive=True)
                     with gr.Row():
+                        cb_diarization = gr.Checkbox(value=False, label="Speaker Diarization?", interactive=True)
+                    with gr.Row():
                         cb_timestamp = gr.Checkbox(value=True, label="Add a timestamp to the end of the filename",
                                                    interactive=True)
                     with gr.Accordion("Advanced_Parameters", open=False):
@@ -107,7 +120,7 @@ class App:
                         tb_indicator = gr.Textbox(label="Output", scale=8)
                         btn_openfolder = gr.Button('📂', scale=2)
 
-                    params = [tb_youtubelink, dd_model, dd_lang, dd_file_format, cb_translate, cb_timestamp]
+                    params = [tb_youtubelink, dd_model, dd_lang, dd_file_format, cb_translate, cb_diarization, cb_timestamp]
                     advanced_params = [nb_beam_size, nb_log_prob_threshold, nb_no_speech_threshold, dd_compute_type]
                     btn_run.click(fn=self.whisper_inf.transcribe_youtube,
                                   inputs=params + advanced_params,
@@ -116,6 +129,7 @@ class App:
                                           outputs=[img_thumbnail, tb_title, tb_description])
                     btn_openfolder.click(fn=lambda: self.open_folder("outputs"), inputs=None, outputs=None)
                     dd_model.change(fn=self.on_change_models, inputs=[dd_model], outputs=[cb_translate])
+                    cb_diarization.change(fn=self.on_change_diarization, inputs=[cb_diarization], outputs=[dd_file_format])
 
                 with gr.TabItem("Mic"):  # tab3
                     with gr.Row():
@@ -128,6 +142,8 @@ class App:
                         dd_file_format = gr.Dropdown(["SRT", "WebVTT", "txt"], value="SRT", label="File Format")
                     with gr.Row():
                         cb_translate = gr.Checkbox(value=False, label="Translate to English?", interactive=True)
+                    with gr.Row():
+                        cb_diarization = gr.Checkbox(value=False, label="Speaker Diarization?", interactive=True)
                     with gr.Accordion("Advanced_Parameters", open=False):
                         nb_beam_size = gr.Number(label="Beam Size", value=1, precision=0, interactive=True)
                         nb_log_prob_threshold = gr.Number(label="Log Probability Threshold", value=-1.0, interactive=True)
@@ -139,13 +155,14 @@ class App:
                         tb_indicator = gr.Textbox(label="Output", scale=8)
                         btn_openfolder = gr.Button('📂', scale=2)
 
-                    params = [mic_input, dd_model, dd_lang, dd_file_format, cb_translate]
+                    params = [mic_input, dd_model, dd_lang, dd_file_format, cb_translate, cb_diarization]
                     advanced_params = [nb_beam_size, nb_log_prob_threshold, nb_no_speech_threshold, dd_compute_type]
                     btn_run.click(fn=self.whisper_inf.transcribe_mic,
                                   inputs=params + advanced_params,
                                   outputs=[tb_indicator])
                     btn_openfolder.click(fn=lambda: self.open_folder("outputs"), inputs=None, outputs=None)
                     dd_model.change(fn=self.on_change_models, inputs=[dd_model], outputs=[cb_translate])
+                    cb_diarization.change(fn=self.on_change_diarization, inputs=[cb_diarization], outputs=[dd_file_format])
 
                 with gr.TabItem("T2T Translation"):  # tab 4
                     with gr.Row():
