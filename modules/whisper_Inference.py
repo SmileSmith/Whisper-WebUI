@@ -8,8 +8,9 @@ from datetime import datetime
 import torch
 
 from .base_interface import BaseInterface
-from modules.subtitle_manager import get_srt, get_vtt, get_txt, write_file, safe_filename
+from modules.subtitle_manager import get_srt, get_vtt, get_vtt_with_diarization, get_txt, write_file, safe_filename
 from modules.youtube_manager import get_ytdata, get_ytaudio
+from modules.pyannote_manager import get_audio_diarization
 
 DEFAULT_MODEL_SIZE = "large-v2"
 
@@ -32,6 +33,7 @@ class WhisperInference(BaseInterface):
                         lang: str,
                         file_format: str,
                         istranslate: bool,
+                        isdiarization: bool,
                         add_timestamp: bool,
                         beam_size: int,
                         log_prob_threshold: float,
@@ -54,6 +56,9 @@ class WhisperInference(BaseInterface):
         istranslate: bool
             Boolean value from gr.Checkbox() that determines whether to translate to English.
             It's Whisper's feature to translate speech from another language directly into English end-to-end.
+        isdiarization: bool
+            Boolean value from gr.Checkbox() that determines whether to diarization speaker.
+            It use pyannote to diarization.
         add_timestamp: bool
             Boolean value from gr.Checkbox() that determines whether to add a timestamp at the end of the filename.
         beam_size: int
@@ -89,6 +94,11 @@ class WhisperInference(BaseInterface):
                                                        compute_type=compute_type,
                                                        progress=progress
                                                        )
+                diarization_result = []
+                if isdiarization:
+                    progress(0.7, desc="Progress..")
+                    diarization_result, _ = get_audio_diarization(fileobj.name)
+
                 progress(1, desc="Completed!")
 
                 file_name, file_ext = os.path.splitext(os.path.basename(fileobj.orig_name))
@@ -96,6 +106,7 @@ class WhisperInference(BaseInterface):
                 subtitle = self.generate_and_write_file(
                     file_name=file_name,
                     transcribed_segments=result,
+                    diarization_segments=diarization_result,
                     add_timestamp=add_timestamp,
                     file_format=file_format
                 )
@@ -124,6 +135,7 @@ class WhisperInference(BaseInterface):
                            lang: str,
                            file_format: str,
                            istranslate: bool,
+                           isdiarization: bool,
                            add_timestamp: bool,
                            beam_size: int,
                            log_prob_threshold: float,
@@ -146,6 +158,9 @@ class WhisperInference(BaseInterface):
         istranslate: bool
             Boolean value from gr.Checkbox() that determines whether to translate to English.
             It's Whisper's feature to translate speech from another language directly into English end-to-end.
+        isdiarization: bool
+            Boolean value from gr.Checkbox() that determines whether to diarization speaker.
+            It use pyannote to diarization.
         add_timestamp: bool
             Boolean value from gr.Checkbox() that determines whether to add a timestamp at the end of the filename.
         beam_size: int
@@ -178,12 +193,18 @@ class WhisperInference(BaseInterface):
                                                    no_speech_threshold=no_speech_threshold,
                                                    compute_type=compute_type,
                                                    progress=progress)
+            diarization_result = []
+            if isdiarization:
+                progress(0.7, desc="Progress..")
+                diarization_result, _ = get_audio_diarization(audio)
+
             progress(1, desc="Completed!")
 
             file_name = safe_filename(yt.title)
             subtitle = self.generate_and_write_file(
                 file_name=file_name,
                 transcribed_segments=result,
+                diarization_segments=diarization_result,
                 add_timestamp=add_timestamp,
                 file_format=file_format
             )
@@ -211,6 +232,7 @@ class WhisperInference(BaseInterface):
                        lang: str,
                        file_format: str,
                        istranslate: bool,
+                       isdiarization: bool,
                        beam_size: int,
                        log_prob_threshold: float,
                        no_speech_threshold: float,
@@ -232,6 +254,9 @@ class WhisperInference(BaseInterface):
         istranslate: bool
             Boolean value from gr.Checkbox() that determines whether to translate to English.
             It's Whisper's feature to translate speech from another language directly into English end-to-end.
+        isdiarization: bool
+            Boolean value from gr.Checkbox() that determines whether to diarization speaker.
+            It use pyannote to diarization.
         beam_size: int
             Int value from gr.Number() that is used for decoding option.
         log_prob_threshold: float
@@ -259,11 +284,17 @@ class WhisperInference(BaseInterface):
                                                    no_speech_threshold=no_speech_threshold,
                                                    compute_type=compute_type,
                                                    progress=progress)
+            diarization_result = []
+            if isdiarization:
+                progress(0.7, desc="Progress..")
+                diarization_result, _ = get_audio_diarization(micaudio)
+
             progress(1, desc="Completed!")
 
             subtitle = self.generate_and_write_file(
                 file_name="Mic",
                 transcribed_segments=result,
+                diarization_segments=diarization_result,
                 add_timestamp=True,
                 file_format=file_format
             )
@@ -327,7 +358,7 @@ class WhisperInference(BaseInterface):
         if lang == "Automatic Detection":
             lang = None
 
-        translatable_model = ["large", "large-v1", "large-v2"]
+        translatable_model = ["large", "large-v1", "large-v2", "large-v3"]
         segments_result = self.model.transcribe(audio=audio,
                                                 language=lang,
                                                 verbose=False,
@@ -363,6 +394,7 @@ class WhisperInference(BaseInterface):
     @staticmethod
     def generate_and_write_file(file_name: str,
                                 transcribed_segments: list,
+                                diarization_segments: list,
                                 add_timestamp: bool,
                                 file_format: str,
                                 ) -> str:
@@ -380,7 +412,10 @@ class WhisperInference(BaseInterface):
             write_file(content, f"{output_path}.srt")
 
         elif file_format == "WebVTT":
-            content = get_vtt(transcribed_segments)
+            if (len(diarization_segments) > 0):
+                content = get_vtt_with_diarization(transcribed_segments, diarization_segments)
+            else:
+                content = get_vtt(transcribed_segments)
             write_file(content, f"{output_path}.vtt")
 
         elif file_format == "txt":

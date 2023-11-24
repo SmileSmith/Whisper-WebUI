@@ -44,6 +44,34 @@ def get_vtt(segments):
     return output
 
 
+def get_vtt_with_diarization(segments: list, diarization_segments: list):
+
+    def intersection_length(segment1, segment2):
+        start = max(segment1['start'], segment2['start'])
+        end = min(segment1['end'], segment2['end'])
+        return max(0, end - start)
+
+    output = "WebVTT\n\n"
+
+    for i, segment in enumerate(segments):
+        speaker_label = "SPEAKER_Unknown"
+        longest_intersection = 0
+        for diarization_segment in diarization_segments:
+            current_intersection = intersection_length(segment, diarization_segment)
+            if current_intersection > longest_intersection:
+                longest_intersection = current_intersection
+                speaker_label = diarization_segment['speaker']
+            elif speaker_label != "SPEAKER_Unknown" and current_intersection == 0:
+                break
+
+        output += f"{i + 1}\n"
+        output += f"{timeformat_vtt(segment['start'])} --> {timeformat_vtt(segment['end'])}\n"
+        if segment['text'].startswith(' '):
+            segment['text'] = segment['text'][1:]
+        output += f"<{speaker_label}> {segment['text']}\n\n"
+    return output
+
+
 def get_txt(segments):
     output = ""
     for i, segment in enumerate(segments):
